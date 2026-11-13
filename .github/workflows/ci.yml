@@ -1,0 +1,13 @@
+name: CI
+on:
+  push:
+  pull_request:
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t demo-deploy-app:${{ github.sha }} --build-arg GIT_SHA=${{ github.sha }} .
+      - name: Run tests inside image
+        run: docker run --rm demo-deploy-app:${{ github.sha }} pytest
