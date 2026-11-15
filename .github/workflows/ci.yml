@@ -10,4 +10,4 @@ jobs:
       - name: Build image
         run: docker build -t demo-deploy-app:${{ github.sha }} --build-arg GIT_SHA=${{ github.sha }} .
       - name: Run tests inside image
-        run: docker run --rm demo-deploy-app:${{ github.sha }} pytest
+        run: docker run --rm demo-deploy-app:${{ github.sha }} python -m pytest

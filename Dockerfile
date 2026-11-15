@@ -15,7 +15,7 @@ WORKDIR /app
 
 # Install dependencies first so this layer is cached between pushes
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip install --retries 5 --timeout 120 -r requirements.txt
 
 # Application code and tests (tests ship in the image so the pipeline
 # can run them with `docker run <image> pytest`)
