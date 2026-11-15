@@ -24,7 +24,9 @@ spec:
       containers:
         - name: app
           image: demo-deploy-app:latest   # replaced by the platform with the built image
-          imagePullPolicy: IfNotPresent
+          # The platform deploys the mutable :latest tag; always fetch it on pod start
+          # so a restarted pod cannot keep using a cached image from an older build.
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
           env:
