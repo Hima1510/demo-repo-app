@@ -4,7 +4,6 @@ import threading
 import time
 from collections import deque
 
-import psutil
 from prometheus_client import Counter, Gauge, Histogram
 
 REQUESTS = Counter("http_requests_total", "HTTP requests", ["method", "path", "status"])
@@ -15,11 +14,36 @@ LATENCY = Histogram(
 CPU = Gauge("app_cpu_percent", "Process CPU usage percent")
 MEMORY = Gauge("app_memory_mb", "Process resident memory in MB")
 
-_proc = psutil.Process()
-_proc.cpu_percent(None)  # prime
 _window = deque()  # (timestamp, status, duration_seconds)
 _lock = threading.Lock()
 WINDOW_SECONDS = 60
+_cpu_sample_lock = threading.Lock()
+_last_cpu_wall = time.monotonic()
+_last_cpu_seconds = time.process_time()
+
+
+def _cpu_percent():
+    """Estimate process CPU use using Python's standard library."""
+    global _last_cpu_wall, _last_cpu_seconds
+    wall = time.monotonic()
+    cpu = time.process_time()
+    with _cpu_sample_lock:
+        elapsed = wall - _last_cpu_wall
+        used = cpu - _last_cpu_seconds
+        _last_cpu_wall, _last_cpu_seconds = wall, cpu
+    return (max(0.0, used) / elapsed * 100) if elapsed > 0 else 0.0
+
+
+def _memory_mb():
+    """Read resident memory from Linux procfs without a third-party package."""
+    try:
+        with open("/proc/self/status", encoding="ascii") as status:
+            for line in status:
+                if line.startswith("VmRSS:"):
+                    return int(line.split()[1]) / 1024
+    except (OSError, ValueError, IndexError):
+        pass
+    return 0.0
 
 
 def record(method, path, status, duration):
@@ -33,8 +57,8 @@ def record(method, path, status, duration):
 
 
 def snapshot():
-    cpu = _proc.cpu_percent(None)
-    mem = _proc.memory_info().rss / (1024 * 1024)
+    cpu = _cpu_percent()
+    mem = _memory_mb()
     CPU.set(cpu)
     MEMORY.set(mem)
     now = time.time()
