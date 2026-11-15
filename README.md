@@ -1,6 +1,6 @@
 # demo-deploy-app
 
-A small Flask service for testing the **Predictive Auto Deployment Platform**
+A small Python service for testing the **Predictive Auto Deployment Platform**
 (see the SRS). It satisfies the platform's repository requirements and gives
 the pipeline, ML risk model, monitoring and rollback something real to work with.
 
@@ -9,21 +9,21 @@ the pipeline, ML risk model, monitoring and rollback something real to work with
 | SRS requirement | Where it is met |
 |---|---|
 | FR2 / Constraint 2.4 - repo must contain a Dockerfile | `Dockerfile` in the repo root |
-| FR5 - run the test suite during the build | `tests/` (pytest). Run with `docker run --rm <image> pytest` |
+| FR5 - run the test suite during the build | `tests/` (standard-library `unittest`). Run with `docker run --rm <image> python -m unittest discover -s tests -v` |
 | FR6 - build image from the Dockerfile | `docker build -t demo-deploy-app .` (port 8080, non-root, healthcheck) |
 | FR7 / FR8 - commit and build metadata | Several source files + tests, so commits vary in files/lines changed |
 | FR10 - deploy to isolated K8s namespace | `k8s/deployment.yaml`, `k8s/service.yaml` (no hard-coded namespace) |
 | FR11 - CPU, memory, error rate, latency | `/metrics` (Prometheus) and `/api/stats` (JSON) |
 | FR12 / FR13 - anomalies and auto-rollback | `/chaos` fault injection endpoints |
 | NFR - rollback within ~30 s | Fast start-up, `/readyz` + `/healthz` probes, `revisionHistoryLimit: 5` |
-| 4.3 / Appendix C - Python, Docker, K8s, Prometheus | Python 3.12, Flask, prometheus-client |
+| 4.3 / Appendix C - Python, Docker, K8s, Prometheus | Python 3.12 standard library; Prometheus text is served by `/metrics` |
 
 ## Run locally
 
 ```bash
 docker build -t demo-deploy-app --build-arg APP_VERSION=1.0.0 --build-arg GIT_SHA=$(git rev-parse --short HEAD) .
 docker run --rm -p 8080:8080 demo-deploy-app
-docker run --rm demo-deploy-app pytest        # run tests inside the image
+docker run --rm demo-deploy-app python -m unittest discover -s tests -v
 ```
 
 ## Endpoints
@@ -53,4 +53,4 @@ docker run --rm demo-deploy-app pytest        # run tests inside the image
 4. **Large commit** - add or edit many files in one push to exercise the "files/lines changed" features.
 5. **Manual rollback** - push two healthy commits, then roll back from the dashboard; confirm with `GET /version`.
 
-`.github/workflows/ci.yml` runs the same build + test steps on GitHub Actions.
+The app has no PyPI runtime dependencies, so the Docker build does not need to download packages. `.github/workflows/ci.yml` builds the image and runs the standard-library test suite on GitHub Actions. The deployment platform's pytest-only test hook will skip tests when pytest is absent; the repository CI runs the full suite with `unittest`.

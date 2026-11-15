@@ -1,25 +1,18 @@
 # Demo application for the Predictive Auto Deployment Platform.
 # Build:  docker build -t demo-deploy-app .
 # Run:    docker run -p 8080:8080 demo-deploy-app
-# Test:   docker run --rm demo-deploy-app pytest
+# Test:   docker run --rm demo-deploy-app python -m unittest discover -s tests -v
 
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
     PYTHONPATH=/app \
     PORT=8080
 
 WORKDIR /app
 
-# Install dependencies first so this layer is cached between pushes
-COPY requirements.txt .
-RUN pip install --retries 5 --timeout 120 -r requirements.txt
-
-# Application code and tests (tests ship in the image so the pipeline
-# can run them with `docker run <image> pytest`)
-COPY pytest.ini .
+# Application code and dependency-free tests
 COPY app ./app
 COPY tests ./tests
 
@@ -38,5 +31,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
   CMD python -c "import urllib.request,os; urllib.request.urlopen('http://127.0.0.1:%s/healthz' % os.environ.get('PORT','8080'), timeout=2)"
 
-# One worker + threads keeps Prometheus metrics in a single process
-CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT} --workers 1 --threads 8 --access-logfile - app.main:app"]
+CMD ["python", "-m", "app.main"]
